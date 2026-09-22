@@ -1,6 +1,6 @@
 # roselink-protocol
 
-RoseLink（`cn.ikaile.ruoshui.client`）耳机的 **BLE / 杰理（JieLi）RCSP** 控制协议整理，以及一个**原创、去 UI 的最小控制核心**（Android / Kotlin）。
+RoseLink（`cn.ikaile.ruoshui.client`）**耳机**的 BLE / 杰理（JieLi）RCSP 控制协议整理，以及一个**原创、去 UI 的最小控制核心**（Android / Kotlin）。
 
 目标：用自己的界面控制耳机，只保留必要的控制链路，丢掉原 App 的臃肿逻辑与 UI。
 
@@ -10,27 +10,30 @@ RoseLink（`cn.ikaile.ruoshui.client`）耳机的 **BLE / 杰理（JieLi）RCSP*
 - 协议常量（GATT UUID、帧结构、命令字）属于设备互操作所需的事实性信息。
 - 请自行确认在你所在地区对自有设备做互操作 / 逆向的合法性；不得用于绕过授权、破解固件或侵犯他人权利。
 
-## 功能盘点
+## 范围
 
-完整清单见 [`docs/features.md`](docs/features.md)（已核对 31 个 `control.*` 能力键）。摘要：
+**只做耳机。** 原 App 还支持无线麦克风（TX/RX/Dongle）、AI 联网服务（翻译 / 语音聊天等）、外观个性化——全部不在本仓库范围内。
+
+## 耳机功能（除 OTA）
+
+完整清单见 [`docs/features.md`](docs/features.md)（含 22 个耳机相关能力键）。摘要：
 
 | 模块 | 内容 |
 | --- | --- |
-| 连接管理 | 扫描 / 连接 / 断开、多设备多点、重命名、后台保活 |
-| 设备信息 | 电量（左 / 右 / 仓）、低电量提醒、MAC、CMIIT ID、固件版本 |
-| 降噪 | 普通 / 深度 / 自适应 / 自动 / 场景 / 单耳、强度分档 |
+| 连接管理 | 扫描 / 连接 / 断开、自动重连、重命名、**多点连接** |
+| 电量 | 左耳 / 右耳 / 充电仓、低电量提醒 |
+| 设备信息 | 固件版本、MAC、CMIIT ID |
+| 降噪 | 普通 / 深度 / 自适应 / 自动 / 场景 / 单耳 + 强度分档 |
 | 通透 | 开关 + 标准 / 舒适 / 人声 3 预设 + 强度 |
-| 音效 | EQ、低音增强、空间音频（4 场景 × 头动/固定）、游戏模式 |
-| 高清音频 | LDAC / LHDC（**需账号级激活**） |
+| 音效 | EQ、低音增强、**空间音频**（4 场景 × 头动/固定）、游戏模式 |
+| 高清音频 | LDAC / LHDC（⚠️ **需账号级激活**） |
 | 安全 | 听力保护（75–95 dB） |
 | 佩戴 | 入耳检测、佩戴自适应、耳塞贴合度测试 |
-| 交互 | 触控 / 轻触手势自定义、头部动作、查找耳机、提示语言 |
-| 麦克风 | 增益 / 降噪 / 低切 / 音色 / 录音 / 声道（TX1、TX2、RX、Dongle） |
-| 个性化 | 自定义主题 / 壁纸、连接弹窗、通知栏电量 |
-| AI（联网） | ASR、翻译、摘要、文生图、语音克隆、语音聊天、播客、解题、语音助手 |
+| 交互 | 触控 / 轻触手势、头部动作、查找耳机、提示语言、自动关机 |
+| 音量 | 主音量、提示音音量、增益 |
 | OTA | ❌ **不实现** |
 
-> 注意：这是**多形态设备**产品线（耳机 / 发射器 / 接收器 / Dongle），不同设备支持的项目不同。客户端依赖 `control.*` 能力键做门控，新 UI 必须保留这套判断。
+> 客户端依赖 `control.*` 能力键做门控，新 UI 必须保留这套判断。
 
 ## 结构
 
@@ -38,7 +41,7 @@ RoseLink（`cn.ikaile.ruoshui.client`）耳机的 **BLE / 杰理（JieLi）RCSP*
 | --- | --- |
 | `docs/protocol.md` | BLE 通道、连接流程、配置帧格式、配置项类型表（ 29 项） |
 | `docs/rcsp-commands.md` | 命令字、传输层参数（MTU / 超时 / PHY） |
-| `docs/features.md` | **完整功能盘点** + 能力键表 + 抓包清单 |
+| `docs/features.md` | 耳机功能清单 + 能力键表 + 抓包清单 + 已排除项 |
 | `core/.../RoselinkUuids.kt` | GATT UUID 常量 |
 | `core/.../ConfigFrame.kt` | 配置帧数据模型 |
 | `core/.../ConfigFrameCodec.kt` | 帧解析 / 生成 |
@@ -47,15 +50,6 @@ RoseLink（`cn.ikaile.ruoshui.client`）耳机的 **BLE / 杰理（JieLi）RCSP*
 | `core/.../NoiseControl.kt` | 降噪 / 通透模式模型 + 自定义命令组装 |
 | `core/.../RcspCommands.kt` | 命令字常量 |
 | `core/.../RoselinkHeadsetClient.kt` | GATT 客户端（扫描 / 连接 / 通知 / 写入 / MTU） |
-
-## 建议的保留范围
-
-```
-连接管理 + 电量 + 设备信息 + 降噪/通透 + EQ + 空间音频 + 游戏模式
-+ 触控设置 + 入耳检测 + 查找耳机 + 贴合度测试 + 听力保护 + 多点连接
-```
-
-可丢：AI 全家桶、个性化主题 / 壁纸、悬浮窗、推送、统计 SDK、OTA。
 
 ## 用法
 
@@ -74,4 +68,4 @@ client.write(CustomCommands.setNoiseMode(NoiseMode.DEEP_ANC, level = 2))
 ## 后续
 
 - [ ] 新 UI（另行设计，核心与 UI 已解耦）
-- [ ] 按 `docs/features.md` 第 9 节抓包，补全各设置载荷
+- [ ] 按 `docs/features.md` 第 8 节抓包，补全各设置载荷

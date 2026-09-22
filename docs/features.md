@@ -1,23 +1,20 @@
-# 功能清单（除 OTA 外全部）
+# 耳机功能清单（除 OTA）
 
-本文档是对 RoseLink App **除 OTA 固件升级外的全部功能**的盘点，用于确认新客户端要保留哪些能力。
+> **范围**：只保留与**耳机本体**相关的功能。
+> 无线麦克风、AI 联网服务、App 外观个性化均已排除，见文末「已排除」。
 
-## 0. 判定方法
+## 0. 能力键（`control.*`）
 
-客户端用一套 `control.xxx` 字符串作为**能力键**，用来判断设备支不支持某项设置、决定是否显示对应入口。
+客户端用一套 `control.xxx` 字符串作为**能力键**，判断设备支不支持某项设置、决定是否显示对应入口。
 
-只要把 `control.` 前缀扫一遍，就能把功能面完整列出。下面第 1 节就是从 `lib/arm64-v8a/libapp.so` 字符串表提取的全部 31 个能力键。
-
-> 对新客户端的启示：**必须保留同样的能力门控逻辑**，否则会在不支持的设备上显示无效开关。
-
-## 1. 全部能力键（`control.*`）
+与耳机相关的共 **22 个**：
 
 | 能力键 | 含义 |
 | --- | --- |
 | `control.deepAnc` | 深度降噪 |
 | `control.ancAuto` | 自动降噪 |
 | `control.ancAutoDynamic` | 动态自适应降噪 |
-| `control.ancLine` | 场景 / 线路降噪 |
+| `control.ancLine` | 场景降噪（通勤 / 室内等） |
 | `control.eq` | 均衡器 |
 | `control.eqBass` | 低音增强 |
 | `control.spatialSwitch` | 空间音频开关 |
@@ -33,154 +30,98 @@
 | `control.tapGesture` | 轻触手势 |
 | `control.headMove` | 头部动作 |
 | `control.findDevice` | 查找耳机 |
-| `control.mulDevice` | 多设备连接 / 多点 |
-| `control.gainLevel` | 增益 |
+| `control.mulDevice` | 多点 / 多设备连接 |
 | `control.dingLevel` | 提示音音量 |
-| `control.hideSearch` | 隐藏搜索入口（UI） |
-| `control.mic.gain` | 麦克风增益 |
-| `control.mic.txNoise` | 麦克风降噪 |
-| `control.mic.txLowCut` | 麦克风低切 |
-| `control.mic.txTone` | 麦克风音色 |
-| `control.mic.txRecord` | 麦克风录音 |
-| `control.mic.timecode` | 麦克风时间码 |
-| `control.mic.rxChannel` | 麦克风接收声道 |
-| `control.mic.switch.` | 麦克风开关 |
+| `control.gainLevel` | 增益 |
 
-## 2. 连接与设备管理
+> 新客户端**必须保留同样的能力门控**，否则会在不支持的机型上显示无效开关。
 
-| 功能 | 证据 |
+---
+
+## 1. 连接与设备管理
+
+| 功能 | 标识 |
 | --- | --- |
-| 扫描 / 连接 / 断开（BLE / SPP / GATT over BR-EDR） | `PROTOCOL_TYPE_*`、`UUID_SERVICE/WRITE/NOTIFY/SPP` |
-| 设备重命名 | `deviceName`、`_buildDeviceName` |
-| **多设备 / 多点连接** | `setMulDevice`、`setAudioMulDevice`、`getMulDeviceNameList`、`DeviceMulDeviceIntent`、`mulDeviceMode` |
-| 设备信息：MAC | `device-personalization-mac-address` |
-| 设备信息：CMIIT ID（中国无线电核准） | `device-personalization-cmiit-id` |
-| 固件版本号 | `FIRMWARE_VERSION`、`extendedFirmwareVersion`、`DONGLE_FIRMWARE_VERSION` |
-| 解绑 / 删除设备 | "After deletion, the device will clear data…" |
-| 后台保活 | `KeepAliveManager$KeepAliveService`（前台服务） |
+| 扫描 / 连接 / 断开 | BLE `AE00/AE01/AE02`、SPP、GATT over BR-EDR |
+| 自动重连 / 后台保活 | `KeepAliveManager$KeepAliveService` |
+| 设备重命名 | `deviceName`、`setDeviceName`、`_buildDeviceName` |
+| **多点 / 多设备连接** | `setMulDevice`、`setAudioMulDevice`、`getMulDeviceNameList`、`mulDeviceMode` |
+| 解除绑定 | "After deletion, the device will clear data…" |
+
+## 2. 电量与设备信息
+
+| 功能 | 标识 |
+| --- | --- |
 | 电量：左耳 / 右耳 / 充电仓 | `batteryLeft`、`batteryCaseInfo`、`RBatteryList`、`_handleBatteryData` |
 | 低电量提醒 | `bindLowBatteryReminder`、`_scheduleLowBatteryReminder` |
-| 通知栏推送电量 | `Push Battery to Notification Shade` |
+| 固件版本 | `FIRMWARE_VERSION`、`extendedFirmwareVersion` |
+| MAC 地址 | `device-personalization-mac-address` |
+| CMIIT ID（中国无线电核准） | `device-personalization-cmiit-id` |
 
-## 3. 降噪 / 通透与音频
+## 3. 降噪与通透
 
-### 3.1 降噪（ANC）
-
-| 能力 | 标识 |
+| 功能 | 标识 |
 | --- | --- |
-| 普通降噪 | `normalAnc`、`noise.simpleAnc` |
+| 普通降噪 | `normalAnc` |
 | 深度降噪 | `deepAnc`、`control.deepAnc`、`setDeepAncOn` |
 | 自适应降噪 | `setAdaptiveAnc`、`Adaptive Noise Cancelling` |
 | 自动 / 动态自动降噪 | `setAncAutoOn`、`setAncAutoDynamicOn` |
-| 场景 / 线路降噪 | `DeviceAncLineIntent` |
+| 场景降噪 | `DeviceAncLineIntent` |
 | 降噪强度分档 | `noiseAncLevel`、`setAncLevel`、`noise-anc-level-2-label` |
-| 单耳降噪 | `device-personalization-single-ear-anc`、`_isAllowSingleEarAncEnabledForCurrentDevice` |
+| 单耳降噪 | `device-personalization-single-ear-anc` |
+| 通透开关 | `transAnc`、`ancTransActivate`、`ancClose` |
+| 通透 3 预设 | `Standard Transparency`、`Comfort Transparency`、`Voice Transparency` |
+| 通透强度 | `TRANSPARENCY_LEVEL`、`getAncTransLevel` |
 | 能力查询 | `getAncList`、`hasAncNoiseControl`、`isAncModel` |
 
-### 3.2 通透（Transparency）
+> 具体载荷见 `NoiseControl.kt`。
 
-| 能力 | 标识 |
-| --- | --- |
-| 通透开关 | `transAnc`、`ancTransActivate`、`ancClose` |
-| 3 种预设 | `Standard Transparency`、`Comfort Transparency`、`Voice Transparency` |
-| 通透强度 | `TRANSPARENCY_LEVEL`、`Transparency Level`、`getAncTransLevel` |
+## 4. 音质与音效
 
-### 3.3 音质与音效
-
-| 能力 | 标识 |
+| 功能 | 标识 |
 | --- | --- |
 | 均衡器 EQ | `Equalizer`、`custom-eq-equalizer`、`control.eq` |
 | 低音增强 | `control.eqBass` |
-| **空间音频** | `setSpatialSwitch`、`setSpatialAudioMusicMode`、`spatialAudioMode` |
-| 空间音频 4 种场景模式 | `setSpatialAudioMusicModeMusic/Movie/Game/TV` |
+| 空间音频开关 | `setSpatialSwitch`、`setSpatialAudioSwitchOn/Off` |
+| 空间音频 4 场景 | `setSpatialAudioMusicModeMusic/Movie/Game/TV` |
 | 空间音频模式 | `spatial_mode_head`（头动）、`spatial_mode_fixed`（固定） |
-| 游戏模式 / 低延迟 | `setGameModeOn`、`setGameModeOff`、`gameModeList` |
+| 游戏模式 | `setGameModeOn/Off`、`gameModeList` |
 | **高清音频 LDAC / LHDC** | `setAudioLdac`、`setAudioLdacLhdc`、`ldacLhdc` |
-| LDAC 需服务端激活 | `/app/activateLDAC/activate`、`getActivateByLoginUser` |
-| 听力保护 | `setHearingProtection`、档位 75/80/85/90/95 dB、`hearing-protection-off` |
-| 音量 | `setVolume`、`AudioVolumeUp/Down/Mute` |
+
+> ⚠️ **LDAC/LHDC 有账号级授权**：`/app/activateLDAC/activate`、`getActivateByLoginUser`。
+> 不是纯本地开关，自己写客户端时要么绕过，要么保留登录流程。
+
+## 5. 安全
+
+| 功能 | 标识 |
+| --- | --- |
+| 听力保护 | `setHearingProtection`、`DeviceHearingProtectionSlider` |
+| 档位 | 关闭 / 75 / 80 / 85 / 90 / 95 dB |
+
+## 6. 佩戴与交互
+
+| 功能 | 标识 |
+| --- | --- |
+| 入耳检测 | `control.earDetection`、`_handleInEarDetection` |
+| 佩戴自适应 | `control.earAdaptive` |
+| 耳塞贴合度测试 | `startEarTipFitTest`、`NormalEarTipFitTestPage`、`recivedEarTipFitResult` |
+| 触控 / 轻触手势 | `control.touch`、`control.tap`、`control.tapGesture`、`rsCommonV2TouchListWithoutAnc` |
+| 头部动作 | `control.headMove` |
+| 查找耳机 | `setFindDeviceLeft/Right/Both`、`openFindDevice` |
+| 提示语言 | `control.earLanguage`、`Firmware Language` |
+| 自动关机 | `setAutoPowerOff` |
+
+## 7. 音量
+
+| 功能 | 标识 |
+| --- | --- |
+| 主音量 | `setVolume`、`AudioVolumeUp/Down/Mute` |
 | 提示音音量 | `control.dingLevel` |
 | 增益 | `control.gainLevel` |
 
-> LDAC/LHDC 有**账号级授权**（`/app/activateLDAC/getActivateByLoginUser`），不是纯本地开关。自己写客户端时要么绕过，要么保留登录流程。
+---
 
-## 4. 佩戴与交互
-
-| 功能 | 标识 |
-| --- | --- |
-| 入耳检测 | `control.earDetection`、`_handleInEarDetection`、`labInEarMode` |
-| 佩戴自适应 | `control.earAdaptive` |
-| **耳塞贴合度测试** | `startEarTipFitTest`、`NormalEarTipFitTestPage`、`recivedEarTipFitResult` |
-| 触控自定义 | `control.touch`、`control.tap`、`control.tapGesture`、`rsCommonV2TouchListWithoutAnc` |
-| 头部动作 | `control.headMove` |
-| **查找耳机** | `openFindDevice`、`setFindDeviceLeft/Right/Both`、`navigation.findDevice` |
-| 耳机提示语言 | `control.earLanguage`、`Firmware Language` |
-| 自动关机 | `setAutoPowerOff`、`micAutoPowerOffState` |
-
-## 5. 麦克风（说明这是含无线麦 / 领夹麦的产品线）
-
-设备角色包含 **TX1 / TX2（两个发射器）**、**RX（接收器）**、**Dongle**：
-
-| 功能 | 标识 |
-| --- | --- |
-| 麦克风增益 | `control.mic.gain` |
-| 麦克风降噪 | `control.mic.txNoise` |
-| 麦克风低切 | `control.mic.txLowCut` |
-| 麦克风音色 | `control.mic.txTone` |
-| 麦克风录音 | `control.mic.txRecord` |
-| 麦克风时间码 | `control.mic.timecode` |
-| 接收声道 | `control.mic.rxChannel` |
-| 麦克风静音 / 音量 | `MicrophoneVolumeMute/Up/Down` |
-| 多设备角色固件 | `TX1 Firmware Upgrade`、`TX2 Firmware Upgrade`、`RX Firmware Upgrade`、`Dongle Firmware Upgrade` |
-
-> 因此「控制耳机」实际是**多形态设备**：耳机、发射器、接收器、Dongle 各有不同设置项。新客户端需要按设备类型分别处理。
-
-## 6. 个性化与外观
-
-| 功能 | 标识 |
-| --- | --- |
-| 自定义主题（新建 / 保存 / 应用 / 删除 / 分享） | `device-personalization-popup-theme-*` 全套 |
-| 图片上传（左 / 右 / 充电图） | `popup-upload`、`popup-left-image`、`popup-right-image`、`popup-charge-image` |
-| 背景清除 | `popup-background-clear` |
-| 悬浮窗权限 | `popup-overlay-permission`（配合 `SYSTEM_ALERT_WINDOW`） |
-| 连接弹窗 | `device-personalization-connected-popup` |
-| 通知栏电量 | `device-personalization-notification-battery` |
-| 电池优化白名单引导 | `personalization-battery-optimization` |
-
-## 7. AI 能力（starburst SDK，走网络）
-
-| 模块 | 接口 |
-| --- | --- |
-| 语音识别 ASR | `SpeechProcessingManager`（43 方法） |
-| 文本翻译 | `translateText`、`/ai/translate/doTranslate` |
-| 语音翻译 / 双人对话 | `_handleSpeechTranslate`、`translateByDouble`、`leftTranslateByDouble` |
-| 会议纪要翻译 | `record_ai_meeting_translate_switch` |
-| 文本摘要 | `ITextSummaryCallback` |
-| 文生图 / 图生图 | `ITextToImageManager`、`ImageToImageRequest` |
-| 语音克隆 | `VoiceCloneManager` |
-| 语音聊天 | `VoiceChatManager`（84 方法） |
-| 播客 | `PodcastManager` |
-| 解题 | `QuestionSolveManager` |
-| TTS 朗读 | `ITextToSpeechStreamCallback` |
-| 语音助手（全屏对话） | `StarburstVoiceAssistantController` |
-| 语音活动检测 VAD | `VadConfig` |
-| 文件任务 / 轮询 | `FileProcessingManager`、`FileResultTaskPoller` |
-| GUI 下发（带屏设备） | `GuiControlManager`（45 方法） |
-
-> 这整块 AI 能力都是**联网服务**，不属于“控制耳机”的核心链路。建议新客户端直接丢，除非你要保留翻译 / 会议功能。
-
-## 8. 建议的最小保留集
-
-如果你只想要“控制耳机的基础功能”，建议保留：
-
-```
-连接管理 + 电量 + 设备信息 + 降噪/通透 + EQ + 空间音频 + 游戏模式
-+ 触控设置 + 入耳检测 + 查找耳机 + 贴合度测试 + 听力保护 + 多点连接
-```
-
-可丢：AI 全家桶、个性化主题/壁纸、悬浮窗、推送、广告/统计 SDK、OTA。
-
-## 9. 抓包清单
+## 8. 抓包清单
 
 所有设置类功能都通过 RCSP 自定义命令 `CMD_CUSTOM (0xF0)` 下发：
 
@@ -205,8 +146,36 @@
 
 对照要点：切换类命令通常只差 1–2 字节，**用 diff 对比最快**。
 
+---
+
+## 9. 已排除（App 有，但不属于耳机功能）
+
+### 9.1 无线麦克风产品线
+
+设备角色包含 TX1 / TX2（发射器）、RX（接收器）、Dongle，配套功能：
+
+- `control.mic.gain`、`control.mic.txNoise`、`control.mic.txLowCut`、`control.mic.txTone`
+- `control.mic.txRecord`、`control.mic.timecode`、`control.mic.rxChannel`、`control.mic.switch.`
+- `MicrophoneVolumeUp/Down/Mute`、`setAutoPowerOff`（mic 版）
+- `TX1/TX2 Firmware Upgrade`、`RX Firmware Upgrade`、`Dongle Firmware Upgrade`、`BLE Chip Firmware Upgrade`
+
+### 9.2 AI 联网服务（starburst SDK）
+
+均需联网，与耳机控制无关：
+
+ASR、文本/语音/会议翻译、文本摘要、文生图、语音克隆、语音聊天、播客、解题、TTS、语音助手、VAD、文件任务轮询、GUI 下发。
+
+### 9.3 App 外观个性化
+
+`device-personalization-popup-theme-*` 全套（自定义主题/壁纸）、图片上传、连接弹窗、悬浮窗、通知栏电量、电池优化引导。
+
+### 9.4 其他
+
+OTA 固件升级（`0xE1`–`0xE8`）、极光/EngageLab 推送、字节 APM 统计、微信/支付宝 SDK。
+
 ## 10. 尚未确认
 
-- `Sleep` 只出现一次，可能只是主题名，不像独立功能。
-- `control.mic.timecode`（时间码）具体用途未明。
+- `control.gainLevel`：耳机输出增益还是麦克风增益，待定（当前保留）。
+- `control.hideSearch`：纯 UI 开关，已排除。
+- `Sleep` 仅出现一次，可能是主题名，非独立功能。
 - 各能力的**字节级载荷**均需抓包确认。
